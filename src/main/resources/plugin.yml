@@ -1,0 +1,13 @@
+name: Sync
+version: '0.1'
+main: cf.wangyu1745.sync.VaultSync
+#depend:
+#softdepend:
+#  - Essentials
+authors: [ wangyu ]
+#description: 背包同步
+commands:
+  gather:
+    aliases: ga
+    usage: gather
+    description: 将所有服务器的vault api下的钱转账到当前服务器
