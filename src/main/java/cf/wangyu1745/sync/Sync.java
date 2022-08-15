@@ -1,5 +1,21 @@
 package cf.wangyu1745.sync;
 
+import cf.wangyu1745.sync.listener.MainListener;
+import net.milkbowl.vault.economy.Economy;
+import net.minecraft.server.v1_12_R1.ItemStack;
+import net.minecraft.server.v1_12_R1.NBTReadLimiter;
+import net.minecraft.server.v1_12_R1.NBTTagCompound;
+import net.minecraft.server.v1_12_R1.NBTTagList;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.RegisteredServiceProvider;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitScheduler;
+import redis.clients.jedis.BinaryJedisPubSub;
+import redis.clients.jedis.Jedis;
+
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.lang.reflect.Method;
@@ -8,23 +24,6 @@ import java.util.Objects;
 import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.entity.Player;
-import org.bukkit.plugin.RegisteredServiceProvider;
-import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitScheduler;
-
-import cf.wangyu1745.sync.listener.MainListener;
-import net.milkbowl.vault.economy.Economy;
-import net.minecraft.server.v1_12_R1.ItemStack;
-import net.minecraft.server.v1_12_R1.NBTReadLimiter;
-import net.minecraft.server.v1_12_R1.NBTTagCompound;
-import net.minecraft.server.v1_12_R1.NBTTagList;
-import redis.clients.jedis.BinaryJedisPubSub;
-import redis.clients.jedis.Jedis;
 
 public final class Sync extends JavaPlugin {
     public static Economy eco;
@@ -94,8 +93,10 @@ public final class Sync extends JavaPlugin {
     private void initConfig() {
         saveDefaultConfig();
         reloadConfig();
-        getConfig().set("id", new Random().nextLong());
-        saveConfig();
+        if (getConfig().getString("id") == null){
+            getConfig().set("id", new Random().nextLong());
+            saveConfig();
+        }
         config = getConfig();
     }
 
