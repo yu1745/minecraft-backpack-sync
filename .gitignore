@@ -103,7 +103,6 @@ pom.xml.versionsBackup
 pom.xml.next
 
 release.properties
-dependency-reduced-pom.xml
 buildNumber.properties
 .mvn/timing.properties
 .mvn/wrapper/maven-wrapper.jar
@@ -113,3 +112,8 @@ buildNumber.properties
 run/
 
 .vscode/
+/untitled/
+/build/
+/gradle/
+/.gradle/
+

@@ -1,8 +1,8 @@
-# id is randomly generated, you can modify it yourself, but you need to ensure that it is UNIQUE.
-# Do not modify it when server is running. 
-# Can only be modified after the server exits normally
 id:
-# AOF should be turned on
+mysql:
+  url:
+  username:
+  password:
 redis:
   host: localhost
   port: 6379

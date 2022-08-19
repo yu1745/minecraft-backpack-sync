@@ -5,9 +5,19 @@ main: cf.wangyu1745.sync.Sync
 depend:
   - Vault
 authors: [ wangyu ]
-description: money sync,backpack sync(support mod items)
+description: 背包同步,金钱同步,跨服传送箱子
 commands:
   gather:
-    aliases: [ga]
+    aliases: [ ga ]
     usage: gather
-    description: Transferring money from different servers to the current server
+    description: 将所有服账户里的钱转到本服
+  link:
+    aliases: [ li ]
+    usage: /link 服务器名字 世界名字 x y z 使用命令时需准星对准箱子,尽量靠近箱子且人和箱子之间不能有任何阻挡，水也不行
+  xyz:
+    description: 打印当前指向的方块的xyz坐标,使用时需准星对准被测方块,尽量靠近且和目标之间不能有任何阻挡，水也不行
+  worldname:
+    aliases: [ world ]
+    description: 打印世界名字
+  servername:
+    description: 打印服务器名字
