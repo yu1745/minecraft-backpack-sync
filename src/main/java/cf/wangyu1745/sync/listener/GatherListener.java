@@ -19,7 +19,7 @@ public class GatherListener {
     private final Economy eco;
     private final RedisTemplate<String, Double> sd;
 
-    public void onMessage(String name) {
+    public void handleMessage(String name) {
         scheduler.scheduleSyncDelayedTask(plugin, () -> {
             System.out.println("name = " + name);
             var balance = eco.getBalance(name);

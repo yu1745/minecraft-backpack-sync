@@ -21,3 +21,6 @@ commands:
     description: 打印世界名字
   servername:
     description: 打印服务器名字
+  cp:
+    usage: cp c/v
+    description: 复制机器配置

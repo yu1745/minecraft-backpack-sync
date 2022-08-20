@@ -64,7 +64,9 @@ public class RedisConfig {
     public RedisMessageListenerContainer redisMessageListenerContainer(RedisConnectionFactory connectionFactory, GatherListener gatherListener) {
         var container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
-        container.addMessageListener(new MessageListenerAdapter(gatherListener,"onMessage"), new ChannelTopic(VAULT_CHANNEL));
+        MessageListenerAdapter adapter = new MessageListenerAdapter(gatherListener);
+        adapter.afterPropertiesSet();
+        container.addMessageListener(adapter, new ChannelTopic(VAULT_CHANNEL));
         return container;
     }
 
