@@ -17,7 +17,7 @@ public class XYZ implements CommandExecutor {
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
         if (cmd.getName().equalsIgnoreCase("xyz") && sender instanceof Player) {
             var p = (Player) sender;
-            Location location = p.getTargetBlock(EnumSet.of(Material.AIR), 2).getLocation();
+            Location location = p.getTargetBlock(EnumSet.of(Material.AIR,Material.WATER), 3).getLocation();
             sender.sendMessage("x:" + location.getBlockX() + " y:" + location.getBlockY() + " z:" + location.getBlockZ());
         }
         return true;

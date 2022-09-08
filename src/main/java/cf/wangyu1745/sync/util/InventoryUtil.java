@@ -1,6 +1,6 @@
 package cf.wangyu1745.sync.util;
 
-import cf.wangyu1745.sync.Sync;
+import cf.wangyu1745.sync.Main;
 import lombok.RequiredArgsConstructor;
 import lombok.var;
 import net.minecraft.server.v1_12_R1.EntityPlayer;
@@ -26,13 +26,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Objects;
 
-import static cf.wangyu1745.sync.Sync.listLoad;
+import static cf.wangyu1745.sync.Main.listLoad;
 
 @Component
 @RequiredArgsConstructor
 public class InventoryUtil {
     // online
     private static final String OL = "/online/";
+    private static final String LAST_LOGIN = "/last_login/";
     // inventory
     private static final String INV = "/inv/";
     // separator
@@ -57,6 +58,7 @@ public class InventoryUtil {
             ss.opsForValue().set(OL.concat(p.getName()), config.getString("id"));
         } else {
             ss.delete(OL.concat(p.getName()));
+            ss.opsForValue().set(LAST_LOGIN.concat(p.getName()), config.getString("id"));
         }
     }
 
@@ -73,7 +75,7 @@ public class InventoryUtil {
             EntityPlayer p = ((CraftPlayer) player).getHandle();
             // readFromNBT
             p.inventory.b(l);
-            System.out.println(p.getName() + " reload cost " + decimalFormat.get().format((double) (System.nanoTime() - start) / 1000000) + " ms");
+            System.out.println(p.getName() + " 重载花费 " + decimalFormat.get().format((double) (System.nanoTime() - start) / 1000000) + " ms");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -86,10 +88,10 @@ public class InventoryUtil {
             // writeToNBT
             var l = p.inventory.a(new NBTTagList());
             var bytes = new ByteArrayOutputStream();
-            Sync.listWrite.invoke(l, new DataOutputStream(bytes));
-            System.out.println(p.getName() + "'s backpack size: " + bytes.size());
+            Main.listWrite.invoke(l, new DataOutputStream(bytes));
+            System.out.println(p.getName() + " 背包占用字节数: " + bytes.size());
             sb.opsForValue().set(INV.concat(player.getName()), bytes.toByteArray());
-            System.out.println(p.getName() + " save cost " + decimalFormat.get().format((double) (System.nanoTime() - start) / 1000000) + " ms");
+            System.out.println(p.getName() + " 保存耗费 " + decimalFormat.get().format((double) (System.nanoTime() - start) / 1000000) + " ms");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -107,7 +109,7 @@ public class InventoryUtil {
                     e.save(nbt);
                     var bytes = new ByteArrayOutputStream();
                     try {
-                        Sync.write.invoke(nbt, new DataOutputStream(bytes));
+                        Main.write.invoke(nbt, new DataOutputStream(bytes));
                         if (bytes.size() != 0) {
                             out.writeInt(bytes.size());
                             out.write(bytes.toByteArray());
@@ -130,7 +132,7 @@ public class InventoryUtil {
                 //noinspection ResultOfMethodCallIgnored
                 in.read(b);
                 var nbt = new NBTTagCompound();
-                Sync.load.invoke(nbt, new DataInputStream(new ByteArrayInputStream(b)), 4, new NBTReadLimiter(2097152));
+                Main.load.invoke(nbt, new DataInputStream(new ByteArrayInputStream(b)), 4, new NBTReadLimiter(2097152));
                 l.add(CraftItemStack.asBukkitCopy(new net.minecraft.server.v1_12_R1.ItemStack(nbt)));
             }
         } catch (Exception ignored) {
@@ -155,7 +157,7 @@ public class InventoryUtil {
     }*/
 
     /**
-     * @return bytes所包含的物品中的前n个所占的字节数
+     * @return bytes所包含的物品格子中的前n个格子所占的字节数
      */
     @SuppressWarnings("ResultOfMethodCallIgnored")
     public static int lenOf(byte[] bytes, int n) {
@@ -174,5 +176,9 @@ public class InventoryUtil {
         } catch (Exception ignored) {
         }
         return Math.min(rt, bytes.length);
+    }
+
+    public String lastLogin(Player p) {
+        return ss.opsForValue().get(LAST_LOGIN.concat(p.getName()));
     }
 }

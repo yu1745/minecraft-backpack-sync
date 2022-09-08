@@ -1,3 +1,4 @@
+/*
 package cf.wangyu1745.sync.command;
 
 import lombok.RequiredArgsConstructor;
@@ -13,7 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 
-import static cf.wangyu1745.sync.Sync.VAULT_CHANNEL;
+import static cf.wangyu1745.sync.Main.VAULT_CHANNEL;
 
 @Component
 @RequiredArgsConstructor
@@ -44,3 +45,4 @@ public class Gather implements CommandExecutor {
         return true;
     }
 }
+*/

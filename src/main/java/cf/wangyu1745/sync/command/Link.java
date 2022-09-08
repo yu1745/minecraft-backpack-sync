@@ -47,7 +47,7 @@ public class Link implements CommandExecutor {
         }
         var block = /*p.getWorld().getBlockAt(Integer.parseInt(args[0]), Integer.parseInt(args[1]),
                 Integer.parseInt(args[2])).getState();*/
-                p.getTargetBlock(EnumSet.of(Material.AIR), 2).getState();
+                p.getTargetBlock(EnumSet.of(Material.AIR,Material.WATER), 3).getState();
         if (!(block instanceof Chest)) {
             sender.sendMessage("使用链接命令需要准星对准箱子");
             return true;

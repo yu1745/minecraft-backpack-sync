@@ -6,12 +6,11 @@ import net.milkbowl.vault.economy.Economy;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitScheduler;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.stereotype.Component;
 
-import static cf.wangyu1745.sync.Sync.VAULT_CHANNEL;
+import static cf.wangyu1745.sync.Main.VAULT_CHANNEL;
 
 @SuppressWarnings({"unused", "deprecation"})
-@Component
+//@Component
 @RequiredArgsConstructor
 public class GatherListener {
     private final BukkitScheduler scheduler;

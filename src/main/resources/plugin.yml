@@ -1,16 +1,16 @@
 name: Sync
 api: '1.12.2'
 version: '${version}'
-main: cf.wangyu1745.sync.Sync
+main: cf.wangyu1745.sync.Main
 depend:
   - Vault
 authors: [ wangyu ]
 description: 背包同步,金钱同步,跨服传送箱子
 commands:
-  gather:
-    aliases: [ ga ]
-    usage: gather
-    description: 将所有服账户里的钱转到本服
+#  gather:
+#    aliases: [ ga ]
+#    usage: gather
+#    description: 将所有服账户里的钱转到本服
   link:
     aliases: [ li ]
     usage: /link 服务器名字 世界名字 x y z 使用命令时需准星对准箱子,尽量靠近箱子且人和箱子之间不能有任何阻挡，水也不行
@@ -21,6 +21,11 @@ commands:
     description: 打印世界名字
   servername:
     description: 打印服务器名字
-  cp:
-    usage: cp c/v
-    description: 复制机器配置
+#  cp:
+#    usage: cp c/v
+#    description: 复制机器配置
+  sync:
+    usage: sync
+  ddd:
+    description: use for test
+

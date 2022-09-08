@@ -1,7 +1,5 @@
 package cf.wangyu1745.sync.config;
 
-import cf.wangyu1745.sync.listener.GatherListener;
-import lombok.var;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,12 +7,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.listener.ChannelTopic;
-import org.springframework.data.redis.listener.RedisMessageListenerContainer;
-import org.springframework.data.redis.listener.adapter.MessageListenerAdapter;
 import org.springframework.data.redis.serializer.RedisSerializer;
-
-import static cf.wangyu1745.sync.Sync.VAULT_CHANNEL;
 
 @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
 @Configuration
@@ -60,7 +53,7 @@ public class RedisConfig {
         return template;
     }*/
 
-    @Bean
+    /*@Bean
     public RedisMessageListenerContainer redisMessageListenerContainer(RedisConnectionFactory connectionFactory, GatherListener gatherListener) {
         var container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
@@ -68,6 +61,6 @@ public class RedisConfig {
         adapter.afterPropertiesSet();
         container.addMessageListener(adapter, new ChannelTopic(VAULT_CHANNEL));
         return container;
-    }
+    }*/
 
 }

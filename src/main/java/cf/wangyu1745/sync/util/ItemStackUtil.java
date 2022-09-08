@@ -1,6 +1,6 @@
 package cf.wangyu1745.sync.util;
 
-import cf.wangyu1745.sync.Sync;
+import cf.wangyu1745.sync.Main;
 import lombok.RequiredArgsConstructor;
 import net.minecraft.server.v1_12_R1.ItemStack;
 import net.minecraft.server.v1_12_R1.NBTReadLimiter;
@@ -13,6 +13,8 @@ import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.util.ArrayList;
 
+
+@SuppressWarnings("unused")
 @Component
 @RequiredArgsConstructor
 public class ItemStackUtil {
@@ -75,7 +77,7 @@ public class ItemStackUtil {
             NBTTagCompound nbtTagCompound = itemStack.save(new NBTTagCompound());
             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(1024);
             DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-            Sync.write.invoke(nbtTagCompound, dataOutputStream);
+            Main.write.invoke(nbtTagCompound, dataOutputStream);
             dataOutput.writeInt(dataOutputStream.size());
 //            dataOutput.writeByte(itemStack.getCount());
             dataOutput.write(byteArrayOutputStream.toByteArray());
@@ -93,7 +95,7 @@ public class ItemStackUtil {
             //noinspection InfiniteLoopStatement
             while (true) {
                 NBTTagCompound nbtTagCompound = new NBTTagCompound();
-                Sync.load.invoke(nbtTagCompound, dataInput, 4, new NBTReadLimiter(2097152));
+                Main.load.invoke(nbtTagCompound, dataInput, 4, new NBTReadLimiter(2097152));
                 itemStacks.add(new ItemStack(nbtTagCompound));
             }
         } catch (Exception e) {

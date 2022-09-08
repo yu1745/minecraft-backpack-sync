@@ -1,3 +1,4 @@
+/*
 package cf.wangyu1745.sync.command;
 
 import cf.wangyu1745.sync.util.ItemStackUtil;
@@ -84,3 +85,4 @@ public class Copy implements CommandExecutor {
         }
     }
 }
+*/

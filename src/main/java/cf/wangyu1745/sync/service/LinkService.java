@@ -11,10 +11,8 @@ import lombok.SneakyThrows;
 import lombok.var;
 import org.apache.commons.lang3.tuple.Pair;
 import org.bukkit.Bukkit;
-import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.block.BlockState;
 import org.bukkit.block.Chest;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.inventory.Inventory;
@@ -25,13 +23,12 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
-import java.util.*;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -43,186 +40,202 @@ public class LinkService implements LifeCycle {
     private final RedisTemplate<String, byte[]> sb;
     private final Logger logger;
     private volatile boolean close = false;
-    private final ExecutorService exe = Executors.newCachedThreadPool();
-    private final CopyOnWriteArrayList<Tunnel> sendList = new CopyOnWriteArrayList<>();
-    private final CopyOnWriteArrayList<Tunnel> receiveList = new CopyOnWriteArrayList<>();
-    private final Queue<Pair<Tunnel, byte[]>> workQueue = new ArrayDeque<>();
-    private final AtomicInteger i = new AtomicInteger(0);
+    private final CountDownLatch closeWait = new CountDownLatch(2);
 
     @SneakyThrows
     @Override
     public void onDisable() {
         close = true;
-        // 等一秒
-        CountDownLatch countDownLatch = new CountDownLatch(1);
-        scheduler.runTaskLater(plugin, countDownLatch::countDown, 20);
-        countDownLatch.await();
+        closeWait.await();
     }
 
-    /**
-     * 0---5(主线程执行发送逻辑)---10(异步刷新活跃的出和入隧道)---15(主线程执行接收逻辑)---20
-     */
     @PostConstruct
     public void post() {
-        // 异步的刷新隧道列表
-        scheduler.runTaskAsynchronously(plugin, this::updateSendList);
-        scheduler.runTaskAsynchronously(plugin, this::updateReceiveList);
-    }
-
-    private void updateSendList() {
-        try {
-            List<Tunnel> list = tunnelMapper.selectList(Wrappers.<Tunnel>lambdaQuery().eq(Tunnel::getFromServer, config.getString("id")).eq(Tunnel::getActive, true));
-            sendList.clear();
-            sendList.addAll(list);
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            if (!close) {
-                scheduler.runTaskLater(plugin, this::send, 20);
-            }
-            if (i.getAndIncrement() % 60 == 0) {
-                logger.info("出方向激活隧道数:" + sendList.size());
-            } else {
-                logger.fine("出方向激活隧道数:" + sendList.size());
-            }
-        }
-    }
-
-    private void updateReceiveList() {
-        try {
-            List<Tunnel> list = tunnelMapper.selectList(Wrappers.<Tunnel>lambdaQuery().eq(Tunnel::getToServer, config.getString("id")).eq(Tunnel::getActive, true));
-            receiveList.clear();
-            receiveList.addAll(list);
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            if (!close) {
-                scheduler.runTaskAsynchronously(plugin, this::retrieve);
-            }
-            if (i.getAndIncrement() % 60 == 1) {
-                logger.info("入方向激活隧道数:" + receiveList.size());
-            } else {
-                logger.fine("入方向激活隧道数:" + receiveList.size());
-            }
-        }
-    }
-
-
-    private void send() {
-        var start = System.currentTimeMillis();
-        final int[] real = {0};
-        try {
-            sendList.forEach(next -> {
-                Location location = new Location(Bukkit.getWorld(next.getFromWorld()), next.getFromX(), next.getFromY(), next.getFromZ());
-                Chunk chunk = location.getChunk();
-                if (location.getWorld().isChunkLoaded(chunk)) {
-                    //区块已经加载
-                    BlockState state;
-                    if ((state = location.getBlock().getState()) instanceof Chest) {
-                        //从现在开始已经确定是一个箱子
-                        Inventory inventory = ((Chest) state).getBlockInventory();
-                        ItemStack[] contents = inventory.getContents();
-                        long count = Arrays.stream(contents).filter(Objects::nonNull).filter(e -> e.getType() != Material.AIR).count();
-                        logger.fine("[" + next.getId() + "] 发送物品数:" + count);
-                        if (count != 0) {
-                            real[0]++;
-                            byte[] bytes = InventoryUtil.itemStacks2Bytes(contents);
-                            inventory.clear();
-                            exe.submit(() -> {
-                                sb.opsForList().rightPush(String.valueOf(next.getId()), bytes);
-                            });
-                        }
-                    } else {
-                        logger.info("[" + next.getId() + "]号隧道源端箱子被破坏，关闭隧道");
-                        exe.submit(() -> next.setActive(false).updateById());
+        CompletableFuture.runAsync(() -> {
+            while (true) {
+                if (!close) {
+                    try {
+                        send().get();
+                        TimeUnit.SECONDS.sleep(1);
+                    } catch (InterruptedException | ExecutionException e) {
+                        throw new RuntimeException(e);
+                    } finally {
+                        closeWait.countDown();
                     }
+                } else {
+                    closeWait.countDown();
+                    return;
                 }
-            });
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            logger.fine("本轮进行了" + real[0] + "次传送,耗时" + (System.currentTimeMillis() - start) + "ms");
-            if (!close) {
-                scheduler.runTaskAsynchronously(plugin, this::updateSendList);
             }
-        }
+        });
+        CompletableFuture.runAsync(() -> {
+            while (true) {
+                if (!close) {
+                    try {
+                        receive().get();
+                        TimeUnit.SECONDS.sleep(1);
+                    } catch (InterruptedException | ExecutionException e) {
+                        throw new RuntimeException(e);
+                    } finally {
+                        closeWait.countDown();
+                    }
+                } else {
+                    closeWait.countDown();
+                    return;
+                }
+            }
+        });
     }
 
-    public void receive() {
-        var start = System.currentTimeMillis();
-        final int[] real = {0};
-        try {
-            for (int i = 0; i < workQueue.size(); i++) {
-                if (i % 50 == 0 && System.currentTimeMillis() - start > 1) {
-                    logger.fine("本轮进行了" + real[0] + "次传送,耗时" + (System.currentTimeMillis() - start) + "ms");
-                    break;
-                }
-                final var poll = Objects.requireNonNull(workQueue.poll());
-                final Location location = new Location(Bukkit.getWorld(poll.getLeft().getToWorld()), poll.getLeft().getToX(), poll.getLeft().getToY(), poll.getLeft().getToZ());
-                final Chunk chunk = location.getChunk();
-                if (location.getWorld().isChunkLoaded(chunk)) {
-                    //区块已经加载
-                    BlockState state;
-                    if ((state = location.getBlock().getState()) instanceof Chest) {
-                        //从现在开始已经确定是一个箱子
-                        Inventory inventory = ((Chest) state).getBlockInventory();
-                        //容器空余格子
-                        int count = (int) Arrays.stream(inventory.getContents()).filter(Objects::nonNull).filter(e -> e.getType() != Material.AIR).count();
-                        int len = InventoryUtil.lenOf(poll.getRight(), inventory.getSize() - count);
-                        if (len == poll.getRight().length) {
-                            //箱子剩余空间够大
-                            ItemStack[] itemStacks = InventoryUtil.bytes2ItemStacks(poll.getRight());
-                            logger.fine("[" + poll.getLeft().getId() + "] 接收物品数:" + itemStacks.length);
-                            inventory.addItem(itemStacks);
-                        } else {
-                            //箱子剩余空间不够大，分割bytes
-                            Pair<byte[], byte[]> split = ArrayUtil.split(poll.getRight(), len);
-                            ItemStack[] itemStacks = InventoryUtil.bytes2ItemStacks(split.getLeft());
-                            inventory.addItem(itemStacks);
-                            // 然后把读剩下的bytes写回redis
-                            exe.submit(() -> {
-                                if (split.getRight().length > 0) {
-                                    sb.opsForList().leftPush(String.valueOf(poll.getLeft().getId()), split.getRight());
+    public CompletableFuture<Void> send() {
+        return CompletableFuture.supplyAsync(() -> tunnelMapper.selectList(Wrappers.<Tunnel>lambdaQuery().eq(Tunnel::getActive, true).eq(Tunnel::getFromServer, config.getString("id")))).thenApplyAsync(l -> l.stream().map(e -> Pair.of(e, new Location(Bukkit.getWorld(e.getFromWorld()), e.getFromX(), e.getFromY(), e.getFromZ())))
+                /*.filter(e -> e.getRight().getChunk().isLoaded())*/
+                .collect(Collectors.toList())).thenAcceptAsync(l -> {
+            var q = new ConcurrentLinkedQueue<>(l);
+            var real = new AtomicInteger();
+            while (!q.isEmpty()) {
+                CountDownLatch countDownLatch = new CountDownLatch(1);
+                scheduler.runTask(plugin, () -> {
+                    try {
+                        var start = System.nanoTime();
+                        for (int i = 0; ; i++) {
+                            if (i % 50 == 0 && System.nanoTime() - start > 1000000) {
+                                return;
+                            }
+                            var poll = q.poll();
+                            if (poll != null) {
+                                Tunnel left = poll.getLeft();
+                                Location right = poll.getRight();
+                                if (right.getChunk().isLoaded()) {
+                                    var state = right.getBlock().getState();
+                                    if (state instanceof Chest) {
+                                        // 从现在开始已经确定是一个箱子
+                                        Inventory inventory = ((Chest) state).getBlockInventory();
+                                        ItemStack[] contents = inventory.getContents();
+                                        // 有物品的格子数
+                                        long count = Arrays.stream(contents).filter(Objects::nonNull).filter(e -> e.getType() != Material.AIR).count();
+                                        if (count != 0) {
+                                            logger.fine(String.format("[%d]发送物品数:%d", left.getId(), count));
+                                            real.incrementAndGet();
+                                            byte[] bytes = InventoryUtil.itemStacks2Bytes(contents);
+                                            inventory.clear();
+                                            CompletableFuture.runAsync(() -> sb.opsForList().rightPush(String.valueOf(left.getId()), bytes));
+                                        }
+                                    } else {
+                                        logger.info(String.format("[%d]入口被破坏", left.getId()));
+                                        closeTunnel(left);
+                                    }
                                 }
-                            });
+                            } else {
+                                // 本轮结束
+                                return;
+                            }
                         }
-                    } else {
-                        // 不是箱子
-                        logger.info("[" + poll.getLeft().getId() + "]号隧道落地箱子被破坏，关闭隧道");
-                        exe.submit(() -> poll.getLeft().setActive(false).updateById());
+                    } finally {
+                        countDownLatch.countDown();
                     }
+                });
+                try {
+                    countDownLatch.await();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
                 }
             }
-            workQueue.forEach(e -> exe.submit(() -> sb.opsForList().leftPush(String.valueOf(e.getLeft().getId()), e.getRight())));
-            workQueue.clear();
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            if (!close) {
-                scheduler.runTaskAsynchronously(plugin, this::updateReceiveList);
-            }
-        }
+            logger.fine("本轮进行了" + real.get() + "次发送");
+        });
     }
 
-    private void retrieve() {
-        try {
-            receiveList.parallelStream().forEach(e -> {
-                for (int j = 0; j < 5; j++) {
-                    byte[] bytes = sb.opsForList().leftPop(String.valueOf(e.getId()));
-                    if (bytes != null && bytes.length > 0) {
-                        workQueue.offer(Pair.of(e, bytes));
-                    } else {
-                        break;
+    public CompletableFuture<Void> receive() {
+        return CompletableFuture.supplyAsync(() -> tunnelMapper.selectList(Wrappers.<Tunnel>lambdaQuery().eq(Tunnel::getToServer, config.getString("id")).eq(Tunnel::getActive, true))).thenApplyAsync(l -> l.stream()
+                        /*.map(e->Pair.of(e,new Location(Bukkit.getWorld(e.getToWorld()), e.getToX(), e.getToY(), e.getToZ())))*/
+                        .map(e -> {
+                            var temp = new ConcurrentLinkedQueue<byte[]>();
+                            for (int i = 0; i < 3; i++) {
+                                byte[] bytes = sb.opsForList().leftPop(String.valueOf(e.getId()));
+                                if (bytes != null) {
+                                    temp.offer(bytes);
+                                }
+                            }
+                            return Pair.of(e, temp);
+                        }).collect(Collectors.toList()))
+                .thenAcceptAsync(l -> {
+                    var q = new ConcurrentLinkedQueue<>(l);
+                    var real = new AtomicInteger();
+                    while (!q.isEmpty()) {
+                        CountDownLatch countDownLatch = new CountDownLatch(1);
+                        scheduler.runTask(plugin, () -> {
+                            try {
+                                var start = System.nanoTime();
+                                for (int i = 0; ; i++) {
+                                    if (i % 50 == 0 && (System.nanoTime() - start) > 1000000) {
+                                        return;
+                                    }
+                                    var poll = q.poll();
+                                    if (poll != null) {
+                                        real.incrementAndGet();
+                                        Tunnel left = poll.getLeft();
+                                        ConcurrentLinkedQueue<byte[]> right = poll.getRight();
+                                        Location location = new Location(Bukkit.getWorld(left.getToWorld()), left.getToX(), left.getToY(), left.getToZ());
+                                        if (location.getChunk().isLoaded()) {
+                                            var state = location.getBlock().getState();
+                                            if (state instanceof Chest) {
+                                                //从现在开始已经确定是一个箱子
+                                                Inventory inventory = ((Chest) state).getBlockInventory();
+                                                //容器已经占用的格子
+                                                while (!right.isEmpty()) {
+                                                    byte[] bytes = right.poll();
+                                                    int count = (int) Arrays.stream(inventory.getContents()).filter(Objects::nonNull).filter(e -> e.getType() != Material.AIR).count();
+                                                    int len = InventoryUtil.lenOf(bytes, inventory.getSize() - count);
+                                                    assert bytes != null;
+                                                    if (len == bytes.length) {
+                                                        //箱子剩余空间够大
+                                                        ItemStack[] itemStacks = InventoryUtil.bytes2ItemStacks(bytes);
+                                                        inventory.addItem(itemStacks);
+                                                        logger.fine(String.format("[%d]接收物品数:%d", left.getId(), itemStacks.length));
+                                                    } else {
+                                                        //箱子剩余空间不够大，分割bytes
+                                                        logger.fine(String.format("[%d]接收物品数:%d", left.getId(), inventory.getSize() - count));
+                                                        Pair<byte[], byte[]> split = ArrayUtil.split(bytes, len);
+                                                        ItemStack[] itemStacks = InventoryUtil.bytes2ItemStacks(split.getLeft());
+                                                        inventory.addItem(itemStacks);
+                                                        // 然后把读剩下的bytes写回redis
+                                                        CompletableFuture.runAsync(() -> {
+                                                            if (split.getRight().length > 0) {
+                                                                sb.opsForList().leftPush(String.valueOf(left.getId()), split.getRight());
+                                                            }
+                                                        });
+                                                        break;
+                                                    }
+                                                }
+                                                CompletableFuture.runAsync(() -> right.forEach(e -> sb.opsForList().leftPush(String.valueOf(left.getId()), e)));
+                                            } else {
+                                                logger.info(String.format("[%d]出口被破坏", left.getId()));
+                                                closeTunnel(left);
+                                            }
+                                        }
+                                    } else {
+                                        // 本轮结束
+                                        return;
+                                    }
+                                }
+                            } finally {
+                                countDownLatch.countDown();
+                            }
+                        });
+                        try {
+                            countDownLatch.await();
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
                     }
-                }
-            });
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            if (!close) {
-                scheduler.runTaskLater(plugin, this::receive, 20);
-            }
-        }
+                    logger.fine("本轮进行了" + real.get() + "次接收");
+                });
     }
 
+    private void closeTunnel(Tunnel t) {
+        CompletableFuture.runAsync(() -> {
+            t.setActive(false);
+            t.updateById();
+        });
+    }
 }

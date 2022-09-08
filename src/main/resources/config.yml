@@ -6,3 +6,4 @@ mysql:
 redis:
   host: localhost
   port: 6379
+zookeeper: localhost:2181
