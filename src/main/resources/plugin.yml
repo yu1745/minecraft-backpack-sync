@@ -7,25 +7,24 @@ depend:
 authors: [ wangyu ]
 description: 背包同步,金钱同步,跨服传送箱子
 commands:
-#  gather:
-#    aliases: [ ga ]
-#    usage: gather
-#    description: 将所有服账户里的钱转到本服
   link:
-    aliases: [ li ]
-    usage: /link 服务器名字 世界名字 x y z 使用命令时需准星对准箱子,尽量靠近箱子且人和箱子之间不能有任何阻挡，水也不行
+    aliases:
+      - li
+    usage: "/link 服务器名字 世界名字 x y z 使用命令时需准星对准箱子,尽量靠近箱子且人和箱子之间不能有方块阻挡"
   xyz:
-    description: 打印当前指向的方块的xyz坐标,使用时需准星对准被测方块,尽量靠近且和目标之间不能有任何阻挡，水也不行
-  worldname:
-    aliases: [ world ]
-    description: 打印世界名字
-  servername:
-    description: 打印服务器名字
-#  cp:
-#    usage: cp c/v
-#    description: 复制机器配置
+    description: "打印当前指向的方块的所属的服务器,所在的世界以及xyz坐标,使用时需准星对准被测方块,尽量靠近且和目标之间不能有方块阻挡"
+  copy:
+    aliases:
+      - cp
+    usage: "/cp 复制配置并得到一根复制棒"
+    description: "复制机器/核电配置"
   sync:
-    usage: sync
+    aliases:
+      - sc
+      - s
+    usage: "/sync list查询所有服务器的钱 /sync transfer server1 server2 100从服务器1向服务器2转100 /sync give server2 xxx 100给server2的xxx玩家打100 "
+    description: "查余额,转账,汇款"
+  kit:
+    description: "礼包"
   ddd:
     description: use for test
-

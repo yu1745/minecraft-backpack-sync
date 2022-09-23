@@ -1,10 +1,12 @@
 package cf.wangyu1745.sync.service;
 
-import cf.wangyu1745.sync.entity.Tunnel;
-import cf.wangyu1745.sync.mapper.TunnelMapper;
-import cf.wangyu1745.sync.util.ArrayUtil;
-import cf.wangyu1745.sync.util.InventoryUtil;
-import cf.wangyu1745.sync.util.LifeCycle;
+import cf.wangyu1745.sync.LifeCycle;
+import cf.wangyu1745.sync.entity.TunnelData;
+import cf.wangyu1745.sync.entity.TunnelInfo;
+import cf.wangyu1745.sync.mapper.TunnelInfoMapper;
+import cf.wangyu1745.sync.mapper.TunnelDataMapper;
+import cf.wangyu1745.sync.util.ItemStackUtil;
+import cf.wangyu1745.sync.util.PlayerInventoryUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
@@ -19,7 +21,6 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitScheduler;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -33,11 +34,12 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class LinkService implements LifeCycle {
-    private final TunnelMapper tunnelMapper;
+    private final TunnelInfoMapper tunnelInfoMapper;
+    private final TunnelDataMapper tunnelDataMapper;
     private final FileConfiguration config;
     private final BukkitScheduler scheduler;
     private final JavaPlugin plugin;
-    private final RedisTemplate<String, byte[]> sb;
+    //    private final RedisTemplate<String, byte[]> sb;
     private final Logger logger;
     private volatile boolean close = false;
     private final CountDownLatch closeWait = new CountDownLatch(2);
@@ -57,7 +59,7 @@ public class LinkService implements LifeCycle {
                     try {
                         send().get();
                         TimeUnit.SECONDS.sleep(1);
-                    } catch (InterruptedException | ExecutionException e) {
+                    } catch (Exception e) {
                         throw new RuntimeException(e);
                     } finally {
                         closeWait.countDown();
@@ -74,7 +76,7 @@ public class LinkService implements LifeCycle {
                     try {
                         receive().get();
                         TimeUnit.SECONDS.sleep(1);
-                    } catch (InterruptedException | ExecutionException e) {
+                    } catch (Exception e) {
                         throw new RuntimeException(e);
                     } finally {
                         closeWait.countDown();
@@ -88,9 +90,7 @@ public class LinkService implements LifeCycle {
     }
 
     public CompletableFuture<Void> send() {
-        return CompletableFuture.supplyAsync(() -> tunnelMapper.selectList(Wrappers.<Tunnel>lambdaQuery().eq(Tunnel::getActive, true).eq(Tunnel::getFromServer, config.getString("id")))).thenApplyAsync(l -> l.stream().map(e -> Pair.of(e, new Location(Bukkit.getWorld(e.getFromWorld()), e.getFromX(), e.getFromY(), e.getFromZ())))
-                /*.filter(e -> e.getRight().getChunk().isLoaded())*/
-                .collect(Collectors.toList())).thenAcceptAsync(l -> {
+        return CompletableFuture.supplyAsync(() -> tunnelInfoMapper.selectList(Wrappers.<TunnelInfo>lambdaQuery().eq(TunnelInfo::getActive, true).eq(TunnelInfo::getFromServer, config.getString("id")))).thenApplyAsync(l -> l.stream().map(e -> Pair.of(e, new Location(Bukkit.getWorld(e.getFromWorld()), e.getFromX(), e.getFromY(), e.getFromZ()))).collect(Collectors.toList())).thenAcceptAsync(l -> {
             var q = new ConcurrentLinkedQueue<>(l);
             var real = new AtomicInteger();
             while (!q.isEmpty()) {
@@ -99,15 +99,17 @@ public class LinkService implements LifeCycle {
                     try {
                         var start = System.nanoTime();
                         for (int i = 0; ; i++) {
+                            // 1ms
                             if (i % 50 == 0 && System.nanoTime() - start > 1000000) {
                                 return;
                             }
                             var poll = q.poll();
                             if (poll != null) {
-                                Tunnel left = poll.getLeft();
-                                Location right = poll.getRight();
-                                if (right.getChunk().isLoaded()) {
-                                    var state = right.getBlock().getState();
+                                TunnelInfo tunnelInfo = poll.getLeft();
+                                Location location = poll.getRight();
+                                if (location.getChunk().isLoaded()) {
+                                    // 区块加载
+                                    var state = location.getBlock().getState();
                                     if (state instanceof Chest) {
                                         // 从现在开始已经确定是一个箱子
                                         Inventory inventory = ((Chest) state).getBlockInventory();
@@ -115,15 +117,18 @@ public class LinkService implements LifeCycle {
                                         // 有物品的格子数
                                         long count = Arrays.stream(contents).filter(Objects::nonNull).filter(e -> e.getType() != Material.AIR).count();
                                         if (count != 0) {
-                                            logger.fine(String.format("[%d]发送物品数:%d", left.getId(), count));
+                                            logger.fine(String.format("[%d]发送物品数:%d", tunnelInfo.getId(), count));
                                             real.incrementAndGet();
-                                            byte[] bytes = InventoryUtil.itemStacks2Bytes(contents);
+                                            var bytesList = PlayerInventoryUtil.itemStacks2BytesList(contents);
                                             inventory.clear();
-                                            CompletableFuture.runAsync(() -> sb.opsForList().rightPush(String.valueOf(left.getId()), bytes));
+                                            CompletableFuture.runAsync(() -> {
+                                                bytesList.parallelStream().forEach(bytes -> TunnelData.builder().tunnelId(tunnelInfo.getId()).data(bytes).build().insert());
+//                                                        sb.opsForList().rightPush(String.valueOf(tunnelInfo.getId()), bytes);
+                                            });
                                         }
                                     } else {
-                                        logger.info(String.format("[%d]入口被破坏", left.getId()));
-                                        closeTunnel(left);
+                                        logger.info(String.format("[%d]入口被破坏", tunnelInfo.getId()));
+                                        closeTunnel(tunnelInfo);
                                     }
                                 }
                             } else {
@@ -146,93 +151,70 @@ public class LinkService implements LifeCycle {
     }
 
     public CompletableFuture<Void> receive() {
-        return CompletableFuture.supplyAsync(() -> tunnelMapper.selectList(Wrappers.<Tunnel>lambdaQuery().eq(Tunnel::getToServer, config.getString("id")).eq(Tunnel::getActive, true))).thenApplyAsync(l -> l.stream()
-                        /*.map(e->Pair.of(e,new Location(Bukkit.getWorld(e.getToWorld()), e.getToX(), e.getToY(), e.getToZ())))*/
-                        .map(e -> {
-                            var temp = new ConcurrentLinkedQueue<byte[]>();
-                            for (int i = 0; i < 3; i++) {
-                                byte[] bytes = sb.opsForList().leftPop(String.valueOf(e.getId()));
-                                if (bytes != null) {
-                                    temp.offer(bytes);
-                                }
+        return CompletableFuture.supplyAsync(() -> tunnelInfoMapper.selectList(Wrappers.<TunnelInfo>lambdaQuery().eq(TunnelInfo::getToServer, config.getString("id")).eq(TunnelInfo::getActive, true))).thenApplyAsync(l -> l.stream()
+//                        .map(e->Pair.of(e,new Location(Bukkit.getWorld(e.getToWorld()), e.getToX(), e.getToY(), e.getToZ())))
+                .map(e -> {
+                    var temp = tunnelDataMapper.getTunnelById(e.getId()).stream().map(TunnelData::getData).collect(Collectors.toCollection(ConcurrentLinkedQueue::new));
+                    return Pair.of(e, temp);
+                }).collect(Collectors.toList())).thenAcceptAsync(l -> {
+            var q = new ConcurrentLinkedQueue<>(l);
+            var real = new AtomicInteger();
+            while (!q.isEmpty()) {
+                CountDownLatch countDownLatch = new CountDownLatch(1);
+                scheduler.runTask(plugin, () -> {
+                    try {
+                        var start = System.nanoTime();
+                        for (int i = 0; ; i++) {
+                            // 1ms
+                            if (i % 50 == 0 && (System.nanoTime() - start) > 1000000) {
+                                return;
                             }
-                            return Pair.of(e, temp);
-                        }).collect(Collectors.toList()))
-                .thenAcceptAsync(l -> {
-                    var q = new ConcurrentLinkedQueue<>(l);
-                    var real = new AtomicInteger();
-                    while (!q.isEmpty()) {
-                        CountDownLatch countDownLatch = new CountDownLatch(1);
-                        scheduler.runTask(plugin, () -> {
-                            try {
-                                var start = System.nanoTime();
-                                for (int i = 0; ; i++) {
-                                    if (i % 50 == 0 && (System.nanoTime() - start) > 1000000) {
-                                        return;
-                                    }
-                                    var poll = q.poll();
-                                    if (poll != null) {
-                                        real.incrementAndGet();
-                                        Tunnel left = poll.getLeft();
-                                        ConcurrentLinkedQueue<byte[]> right = poll.getRight();
-                                        Location location = new Location(Bukkit.getWorld(left.getToWorld()), left.getToX(), left.getToY(), left.getToZ());
-                                        if (location.getChunk().isLoaded()) {
-                                            var state = location.getBlock().getState();
-                                            if (state instanceof Chest) {
-                                                //从现在开始已经确定是一个箱子
-                                                Inventory inventory = ((Chest) state).getBlockInventory();
-                                                //容器已经占用的格子
-                                                while (!right.isEmpty()) {
-                                                    byte[] bytes = right.poll();
-                                                    int count = (int) Arrays.stream(inventory.getContents()).filter(Objects::nonNull).filter(e -> e.getType() != Material.AIR).count();
-                                                    int len = InventoryUtil.lenOf(bytes, inventory.getSize() - count);
-                                                    assert bytes != null;
-                                                    if (len == bytes.length) {
-                                                        //箱子剩余空间够大
-                                                        ItemStack[] itemStacks = InventoryUtil.bytes2ItemStacks(bytes);
-                                                        inventory.addItem(itemStacks);
-                                                        logger.fine(String.format("[%d]接收物品数:%d", left.getId(), itemStacks.length));
-                                                    } else {
-                                                        //箱子剩余空间不够大，分割bytes
-                                                        logger.fine(String.format("[%d]接收物品数:%d", left.getId(), inventory.getSize() - count));
-                                                        Pair<byte[], byte[]> split = ArrayUtil.split(bytes, len);
-                                                        ItemStack[] itemStacks = InventoryUtil.bytes2ItemStacks(split.getLeft());
-                                                        inventory.addItem(itemStacks);
-                                                        // 然后把读剩下的bytes写回redis
-                                                        CompletableFuture.runAsync(() -> {
-                                                            if (split.getRight().length > 0) {
-                                                                sb.opsForList().leftPush(String.valueOf(left.getId()), split.getRight());
-                                                            }
-                                                        });
-                                                        break;
-                                                    }
-                                                }
-                                                CompletableFuture.runAsync(() -> right.forEach(e -> sb.opsForList().leftPush(String.valueOf(left.getId()), e)));
-                                            } else {
-                                                logger.info(String.format("[%d]出口被破坏", left.getId()));
-                                                closeTunnel(left);
+                            var poll = q.poll();
+                            if (poll != null) {
+                                real.incrementAndGet();
+                                TunnelInfo tunnelInfo = poll.getLeft();
+                                ConcurrentLinkedQueue<byte[]> queue = poll.getRight();
+                                Location location = new Location(Bukkit.getWorld(tunnelInfo.getToWorld()), tunnelInfo.getToX(), tunnelInfo.getToY(), tunnelInfo.getToZ());
+                                if (location.getChunk().isLoaded()) {
+                                    // 区块已经加载
+                                    var state = location.getBlock().getState();
+                                    if (state instanceof Chest) {
+                                        //从现在开始已经确定是一个箱子
+                                        Inventory inventory = ((Chest) state).getBlockInventory();
+                                        //容器已经占用的格子
+                                        while (!queue.isEmpty()) {
+//                                            byte[] bytes = queue.poll();
+                                            var left = 27 - Arrays.stream(inventory.getContents()).filter(Objects::nonNull).filter(e -> e.getType() != Material.AIR).count();
+                                            for (int j = 0; j < left; j++) {
+                                                inventory.addItem(ItemStackUtil.bytes2itemStack(queue.poll()));
                                             }
+                                            CompletableFuture.runAsync(() -> queue.forEach(bytes1 -> TunnelData.builder().data(bytes1).tunnelId(tunnelInfo.getId()).build().insert()));
                                         }
                                     } else {
-                                        // 本轮结束
-                                        return;
+                                        logger.info(String.format("[%d]出口被破坏", tunnelInfo.getId()));
+                                        closeTunnel(tunnelInfo);
                                     }
                                 }
-                            } finally {
-                                countDownLatch.countDown();
+                            } else {
+                                // 本轮结束
+                                return;
                             }
-                        });
-                        try {
-                            countDownLatch.await();
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
                         }
+                    } finally {
+                        countDownLatch.countDown();
                     }
-                    logger.fine("本轮进行了" + real.get() + "次接收");
                 });
+                try {
+                    countDownLatch.await();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            logger.fine("本轮进行了" + real.get() + "次接收");
+        });
     }
 
-    private void closeTunnel(Tunnel t) {
+    private void closeTunnel(TunnelInfo t) {
         CompletableFuture.runAsync(() -> {
             t.setActive(false);
             t.updateById();

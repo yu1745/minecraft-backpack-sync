@@ -1,6 +1,6 @@
 package cf.wangyu1745.sync.mapper;
 
-import cf.wangyu1745.sync.entity.Tunnel;
+import cf.wangyu1745.sync.entity.Kit;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 
 /**
@@ -9,8 +9,8 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
  * </p>
  *
  * @author wangyu
- * @since 2022-08-16
+ * @since 2022-09-12
  */
-public interface TunnelMapper extends BaseMapper<Tunnel> {
+public interface KitMapper extends BaseMapper<Kit> {
 
 }

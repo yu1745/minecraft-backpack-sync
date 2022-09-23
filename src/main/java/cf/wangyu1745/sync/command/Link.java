@@ -1,6 +1,6 @@
 package cf.wangyu1745.sync.command;
 
-import cf.wangyu1745.sync.entity.Tunnel;
+import cf.wangyu1745.sync.entity.TunnelInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.var;
 import org.bukkit.Material;
@@ -23,6 +23,7 @@ import java.util.Random;
 @Component
 @RequiredArgsConstructor
 public class Link implements CommandExecutor {
+    public static final String LINK = "link";
     private final JavaPlugin plugin;
     private final BukkitScheduler scheduler;
     private final FileConfiguration config;
@@ -47,7 +48,7 @@ public class Link implements CommandExecutor {
         }
         var block = /*p.getWorld().getBlockAt(Integer.parseInt(args[0]), Integer.parseInt(args[1]),
                 Integer.parseInt(args[2])).getState();*/
-                p.getTargetBlock(EnumSet.of(Material.AIR,Material.WATER), 3).getState();
+                p.getTargetBlock(EnumSet.of(Material.AIR, Material.WATER), 3).getState();
         if (!(block instanceof Chest)) {
             sender.sendMessage("使用链接命令需要准星对准箱子");
             return true;
@@ -69,8 +70,8 @@ public class Link implements CommandExecutor {
             if (count_ != nextInt) {
                 p.sendMessage("木棍数量不符,隧道创建失败");
             } else {
-                Tunnel tunnel = Tunnel.builder().fromServer(config.getString("id")).fromWorld(p.getWorld().getName()).fromX(block.getX()).fromY(block.getY()).fromZ(block.getZ()).toServer(args[0]).toWorld(args[1]).toX(Integer.parseInt(args[2])).toY(Integer.parseInt(args[3])).toZ(Integer.parseInt(args[4])).active(true).build();
-                tunnel.insert();
+                TunnelInfo tunnelInfo = TunnelInfo.builder().fromServer(config.getString("id")).fromWorld(p.getWorld().getName()).fromX(block.getX()).fromY(block.getY()).fromZ(block.getZ()).toServer(args[0]).toWorld(args[1]).toX(Integer.parseInt(args[2])).toY(Integer.parseInt(args[3])).toZ(Integer.parseInt(args[4])).active(true).creator(p.getName()).build();
+                tunnelInfo.insert();
                 p.sendMessage("隧道创建成功");
             }
         }, 60);

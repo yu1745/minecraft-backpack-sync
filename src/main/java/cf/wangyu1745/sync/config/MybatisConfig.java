@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.config.GlobalConfig;
 import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.mybatis.spring.mapper.MapperScannerConfigurer;
@@ -12,17 +13,20 @@ import org.springframework.context.annotation.Configuration;
 
 import javax.sql.DataSource;
 
+@SuppressWarnings("SpringFacetCodeInspection")
 @Configuration
+@RequiredArgsConstructor
 public class MybatisConfig {
-
+    @SuppressWarnings("unused")
+    private final FileConfiguration config;
     @SneakyThrows
     @Bean
     public DataSource dataSource(@SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection") FileConfiguration config) {
         HikariConfig hikariConfig = new HikariConfig();
-        hikariConfig.setDriverClassName("com.mysql.cj.jdbc.Driver");
-        hikariConfig.setJdbcUrl(config.getString("mysql.url"));
-        hikariConfig.setUsername(config.getString("mysql.username"));
-        hikariConfig.setPassword(config.getString("mysql.password"));
+        hikariConfig.setDriverClassName("org.postgresql.Driver");
+        hikariConfig.setJdbcUrl(config.getString("database.url"));
+        hikariConfig.setUsername(config.getString("database.username"));
+        hikariConfig.setPassword(config.getString("database.password"));
         return new HikariDataSource(hikariConfig);
     }
 
@@ -35,11 +39,11 @@ public class MybatisConfig {
         globalConfig.setBanner(false);
         sqlSessionFactoryBean.setGlobalConfig(globalConfig);
         //打印sql语句
-//        if(Main.debug) {
-//            MybatisConfiguration mybatisConfiguration = new MybatisConfiguration();
-//            mybatisConfiguration.setLogImpl(StdOutImpl.class);
-//            sqlSessionFactoryBean.setConfiguration(mybatisConfiguration);
-//        }
+       /* if(config.getBoolean("debug")) {
+            MybatisConfiguration mybatisConfiguration = new MybatisConfiguration();
+            mybatisConfiguration.setLogImpl(StdOutImpl.class);
+            sqlSessionFactoryBean.setConfiguration(mybatisConfiguration);
+        }*/
         return sqlSessionFactoryBean;
     }
 

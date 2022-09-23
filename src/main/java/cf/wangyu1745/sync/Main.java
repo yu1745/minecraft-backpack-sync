@@ -1,12 +1,12 @@
 package cf.wangyu1745.sync;
 
-import cf.wangyu1745.sync.aspect.LoadTime;
+import cf.wangyu1745.sync.aspect.Time;
 import cf.wangyu1745.sync.command.*;
-import cf.wangyu1745.sync.listener.MainListener;
-import cf.wangyu1745.sync.util.LifeCycle;
+import cf.wangyu1745.sync.listener.CopyListener;
+import cf.wangyu1745.sync.listener.KitListener;
+import cf.wangyu1745.sync.listener.LogIOListener;
 import lombok.SneakyThrows;
 import net.milkbowl.vault.economy.Economy;
-import net.milkbowl.vault.economy.EconomyResponse;
 import net.minecraft.server.v1_12_R1.NBTReadLimiter;
 import net.minecraft.server.v1_12_R1.NBTTagCompound;
 import net.minecraft.server.v1_12_R1.NBTTagList;
@@ -30,17 +30,21 @@ import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@SuppressWarnings("deprecation")
+import static cf.wangyu1745.sync.command.Copy.COPY;
+import static cf.wangyu1745.sync.command.Kit.KIT;
+import static cf.wangyu1745.sync.command.Link.LINK;
+import static cf.wangyu1745.sync.command.Sync.SYNC;
+import static cf.wangyu1745.sync.command.XYZInfo.XYZ;
+
 public final class Main extends JavaPlugin {
     public static volatile boolean debug = false;
-    public static final String VAULT_CHANNEL = "/vault/";
     public static final String RPC_PATH = "/sync";
 
     public static Method listWrite;
     public static Method listLoad;
     public static Method write;
     public static Method load;
-    public static ApplicationContext context;
+    public static volatile ApplicationContext context;
 
     @Override
     public void onEnable() {
@@ -51,26 +55,34 @@ public final class Main extends JavaPlugin {
             return;
         }
         //注册事件监听器
-        getServer().getPluginManager().registerEvents(context.getBean(MainListener.class), this);
+        getServer().getPluginManager().registerEvents(context.getBean(LogIOListener.class), this);
+        getServer().getPluginManager().registerEvents(context.getBean(KitListener.class), this);
+        getServer().getPluginManager().registerEvents(context.getBean(CopyListener.class), this);
         //注册命令
-        Bukkit.getPluginCommand("servername").setExecutor(context.getBean(ServerName.class));
-        Bukkit.getPluginCommand("worldname").setExecutor(context.getBean(WorldName.class));
-//        Bukkit.getPluginCommand("gather").setExecutor(context.getBean(Gather.class));
-        Bukkit.getPluginCommand("link").setExecutor(context.getBean(Link.class));
-        Bukkit.getPluginCommand("xyz").setExecutor(context.getBean(XYZ.class));
-//        Bukkit.getPluginCommand("cp").setExecutor(context.getBean(Copy.class));
-        Bukkit.getPluginCommand("sync").setExecutor(context.getBean(cf.wangyu1745.sync.command.Sync.class));
+        getCommand(LINK).setExecutor(context.getBean(Link.class));
+        getCommand(XYZ).setExecutor(context.getBean(XYZInfo.class));
+        getCommand(COPY).setExecutor(context.getBean(Copy.class));
+        getCommand(SYNC).setExecutor(context.getBean(Sync.class));
+        getCommand(KIT).setExecutor(context.getBean(Kit.class));
+
+
+//        Kit.inventory = Bukkit.createInventory(new Kit.InvHolder(), 54);
+//        getCommand()
     }
 
+    /**
+     * 测试用途
+     */
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (command.getName().equalsIgnoreCase("ddd")) {
-            Economy economy = context.getBean(Economy.class);
+            /*Economy economy = context.getBean(Economy.class);
             EconomyResponse resp = economy.withdrawPlayer("wangyu", 1000);
             System.out.println("resp.transactionSuccess() = " + resp.transactionSuccess());
             System.out.println("resp.amount = " + resp.amount);
             System.out.println("resp.balance = " + resp.balance);
-            System.out.println("resp.errorMessage = " + resp.errorMessage);
+            System.out.println("resp.errorMessage = " + resp.errorMessage);*/
+            sender.getEffectivePermissions().forEach(e-> System.out.println(e.getPermission()));
         }
         return true;
     }
@@ -128,7 +140,7 @@ public final class Main extends JavaPlugin {
         context_.registerBean(Economy.class, () -> Objects.requireNonNull(rsp).getProvider());
         context_.registerBean(JavaPlugin.class, () -> this);
         context_.registerBean(FileConfiguration.class, this::getConfig);
-        context_.registerBean(LoadTime.class, getLogger());
+        context_.registerBean(Time.class, getLogger());
         long start = System.currentTimeMillis();
         context_.scan(Main.class.getPackage().getName());
         long scan = System.currentTimeMillis();

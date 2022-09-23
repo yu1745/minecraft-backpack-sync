@@ -12,20 +12,20 @@ import java.io.Serializable;
 
 /**
  * <p>
- *
+ * 
  * </p>
  *
  * @author wangyu
- * @since 2022-08-16
+ * @since 2022-09-13
  */
-@TableName("tunnel")
-@Builder
 @Data
 @EqualsAndHashCode(callSuper = false)
-@Accessors(chain = true)
-@AllArgsConstructor
+@Builder
 @NoArgsConstructor
-public class Tunnel extends Model<Tunnel> {
+@AllArgsConstructor
+@Accessors(chain = true)
+@TableName("tunnel_info")
+public class TunnelInfo extends Model<TunnelInfo> {
 
     private static final long serialVersionUID = 1L;
 
@@ -65,9 +65,11 @@ public class Tunnel extends Model<Tunnel> {
     @TableField("active")
     private Boolean active;
 
+    @TableField("creator")
+    private String creator;
+
     @Override
     public Serializable pkVal() {
         return this.id;
     }
 }
-

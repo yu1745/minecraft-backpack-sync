@@ -8,9 +8,6 @@ plugins {
 
 
 repositories {
-    maven {
-        url 'https://maven.aliyun.com/repository/public/'
-    }
     mavenLocal()
     mavenCentral()
     maven {
@@ -34,20 +31,18 @@ dependencies {
     implementation('com.baomidou:mybatis-plus:3.5.2') {
         exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
     }
-    implementation 'org.mybatis:mybatis:3.5.10'
-    implementation 'org.springframework:spring-context:5.3.22'
-    implementation 'org.springframework:spring-jdbc:5.3.22'
-    implementation 'org.springframework:spring-aspects:5.3.22'
-    implementation 'org.springframework:spring-aop:5.3.22'
-//    implementation 'io.lettuce:lettuce-core:6.2.0.RELEASE'
-    //noinspection GradlePackageUpdate
-    implementation 'redis.clients:jedis:3.9.0'
-    implementation 'org.springframework.data:spring-data-redis:2.7.2'
-    implementation 'mysql:mysql-connector-java:8.0.30'
+    implementation 'org.mybatis:mybatis:3.5.11'
+    implementation 'org.springframework:spring-context:5.3.23'
+    implementation 'org.springframework:spring-jdbc:5.3.23'
+    implementation 'org.springframework:spring-aspects:5.3.23'
+    implementation 'org.springframework:spring-aop:5.3.23'
+    implementation 'org.postgresql:postgresql:42.5.0'
     //noinspection GradlePackageUpdate
     implementation 'com.zaxxer:HikariCP:4.0.3'
     testImplementation 'com.baomidou:mybatis-plus-generator:3.5.3'
     testImplementation 'org.apache.velocity:velocity-engine-core:2.3'
+    //noinspection VulnerableLibrariesLocal
+    compileOnly 'org.spigotmc:spigot-api:1.12.2-R0.1-SNAPSHOT'
     compileOnly 'org.spigotmc:spigot:1.12.2-R0.1-SNAPSHOT'
     //noinspection VulnerableLibrariesLocal
     compileOnly 'com.github.MilkBowl:VaultAPI:1.7'
@@ -55,8 +50,7 @@ dependencies {
     annotationProcessor 'org.projectlombok:lombok:1.18.24'
     testCompileOnly 'org.projectlombok:lombok:1.18.24'
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.24'
-    compileOnly 'net.industrial-craft:industrialcraft-2:2.8.221-ex112:dev'
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.13.3'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.13.4'
     //noinspection VulnerableLibrariesLocal
     implementation('org.apache.zookeeper:zookeeper:3.8.0') {
         exclude group: 'org.slf4j', module: 'slf4j-log4j12'
@@ -65,12 +59,13 @@ dependencies {
     }
     implementation 'org.apache.curator:curator-x-async:5.3.0'
     implementation project('nettyRPC')
+    compileOnly 'net.industrial-craft:industrialcraft-2:2.8.221-ex112:dev'
 
 }
 
 
 group = 'cf.wangyu1745'
-version = '1.0'
+version = '1.1'
 description = 'Sync'
 
 

@@ -1,8 +1,5 @@
 package cf.wangyu1745.sync.service;
 
-import cf.wangyu1745.sync.aspect.MainThread;
-
-@MainThread
 public interface IVaultService {
     boolean addMoney(String name, double money);
 

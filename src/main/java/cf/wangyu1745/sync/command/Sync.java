@@ -5,7 +5,6 @@ import cf.wangyu1745.sync.service.IVaultService;
 import cf.wangyu1745.sync.service.VaultService;
 import lombok.RequiredArgsConstructor;
 import lombok.var;
-import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -19,32 +18,31 @@ import java.util.concurrent.CompletableFuture;
 @Component
 @RequiredArgsConstructor
 public class Sync implements CommandExecutor {
+    private enum Command {
+        list, transfer, give
+    }
+
+    public static final String SYNC = "sync";
     private final Clients clients;
     private final VaultService vaultService;
-//    private final ObjectMapper mapper = new ObjectMapper();
     private final FileConfiguration config;
-    private static final String LIST = "list";
-    private static final String TRANSFER = "transfer";
-    private static final String GIVE = "give";
 
     @Override
-    public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
-        if (cmd.getName().equalsIgnoreCase("sync") && sender instanceof Player) {
+    public boolean onCommand(CommandSender sender, org.bukkit.command.Command cmd, String label, String[] args) {
+        if (cmd.getName().equalsIgnoreCase(SYNC) && (sender instanceof Player)) {
             try {
                 var p = (Player) sender;
-//                List<Clients.ServiceWrapper<Economy>> services = clients.getServices(Economy.class);
                 List<Clients.ServiceWrapper<IVaultService>> services = clients.getServices(IVaultService.class);
-//                services.add(new Clients.ServiceWrapper<>(config.getString("id"), eco));
                 services.add(new Clients.ServiceWrapper<>(config.getString("id"), vaultService));
-                switch (args[0]) {
-                    case LIST: {
+                switch (Command.valueOf(args[0])) {
+                    case list: {
                         CompletableFuture.runAsync(() -> {
 //                            services.parallelStream().forEach(economy -> p.sendMessage(economy.getServerId() + ":" + economy.getService().getBalance(p.getName())));
                             services.parallelStream().forEach(vault -> p.sendMessage(vault.getServerId() + ":" + vault.getService().getMoney(p.getName())));
                         });
                         break;
                     }
-                    case TRANSFER: {
+                    case transfer: {
                         if (args.length != 4) {
                             p.sendMessage("参数错误");
                             p.sendMessage("使用例子: /sync transfer server1 server2 100");
@@ -55,7 +53,6 @@ public class Sync implements CommandExecutor {
                         String to = args[2];
                         double num = Double.parseDouble(args[3]);
                         CompletableFuture.runAsync(() -> {
-//                            Optional<Clients.ServiceWrapper<Economy>> from_ = services.stream().filter(e -> e.getServerId().equals(from)).findAny();
                             Optional<Clients.ServiceWrapper<IVaultService>> from_ = services.stream().filter(e -> e.getServerId().equals(from)).findAny();
                             Optional<Clients.ServiceWrapper<IVaultService>> to_ = services.stream().filter(e -> e.getServerId().equals(to)).findAny();
                             if (from_.isPresent() && to_.isPresent()) {
@@ -84,7 +81,7 @@ public class Sync implements CommandExecutor {
                         });
                         break;
                     }
-                    case GIVE: {
+                    case give: {
                         if (args.length == 4) {
                             String dstServer = args[1];
                             String dstPlayer = args[2];

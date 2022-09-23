@@ -1,4 +1,4 @@
-package cf.wangyu1745.sync.util;
+package cf.wangyu1745.sync;
 
 public interface LifeCycle {
     void onDisable();

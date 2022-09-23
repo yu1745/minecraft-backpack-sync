@@ -1,9 +1,8 @@
 id:
-mysql:
-  url:
-  username:
-  password:
-redis:
-  host: localhost
-  port: 6379
+#此处只是示例！！！需要你按自己的环境改动
+database:
+  url: jdbc:postgresql://localhost:5432/sync
+  username: postgres
+  password: 123456
 zookeeper: localhost:2181
+debug: false
