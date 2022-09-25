@@ -10,21 +10,29 @@ commands:
   link:
     aliases:
       - li
+      - l
     usage: "/link 服务器名字 世界名字 x y z 使用命令时需准星对准箱子,尽量靠近箱子且人和箱子之间不能有方块阻挡"
   xyz:
-    description: "打印当前指向的方块的所属的服务器,所在的世界以及xyz坐标,使用时需准星对准被测方块,尽量靠近且和目标之间不能有方块阻挡"
+    description: "打印当前指向的方块的所属的服务器,所在的世界以及xyz坐标,使用时需准星对准被测方块,尽量靠近且和目标之间不能有方块阻挡(不建议站在方块上使用)"
   copy:
     aliases:
       - cp
-    usage: "/cp 复制配置并得到一根复制棒"
+    usage: "/cp 复制配置并得到一根复制棒,使用复制棒右键要粘贴配置的机器"
     description: "复制机器/核电配置"
   sync:
     aliases:
+      - sy
       - sc
       - s
-    usage: "/sync list查询所有服务器的钱 /sync transfer server1 server2 100从服务器1向服务器2转100 /sync give server2 xxx 100给server2的xxx玩家打100 "
+    usage: "list:查询所有服务器的钱,transfer server1 server2 100:从服务器1向服务器2转100,give server2 xxx 100:给server2的xxx玩家打100 "
     description: "查余额,转账,汇款"
-  kit:
-    description: "礼包"
+#  kit:
+#    description: "礼包"
   ddd:
-    description: use for test
+    description: 测试用
+  movehouse:
+    description: "获得一根搬家棒,右键选取两个点后再次右键即可将两个点之间的地图搬到再次右键的点上,如果选错了,左键会清空选取的点"
+    permission: op
+    aliases:
+      - move
+      - mv

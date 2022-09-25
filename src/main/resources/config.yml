@@ -6,3 +6,6 @@ database:
   password: 123456
 zookeeper: localhost:2181
 debug: false
+#搬家/复制棒材质,默认是木棍如果和其他插件冲突可以设置为其他材质比如木板,可选的材质查看下面的链接,不能是AIR/WATER之类的东西!!!
+#https://jd.papermc.io/paper/1.12/org/bukkit/Material.html
+material: STICK

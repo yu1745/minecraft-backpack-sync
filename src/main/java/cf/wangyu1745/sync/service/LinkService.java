@@ -6,7 +6,6 @@ import cf.wangyu1745.sync.entity.TunnelInfo;
 import cf.wangyu1745.sync.mapper.TunnelInfoMapper;
 import cf.wangyu1745.sync.mapper.TunnelDataMapper;
 import cf.wangyu1745.sync.util.ItemStackUtil;
-import cf.wangyu1745.sync.util.PlayerInventoryUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
@@ -119,7 +118,7 @@ public class LinkService implements LifeCycle {
                                         if (count != 0) {
                                             logger.fine(String.format("[%d]发送物品数:%d", tunnelInfo.getId(), count));
                                             real.incrementAndGet();
-                                            var bytesList = PlayerInventoryUtil.itemStacks2BytesList(contents);
+                                            var bytesList = ItemStackUtil.itemStacks2BytesList(contents);
                                             inventory.clear();
                                             CompletableFuture.runAsync(() -> {
                                                 bytesList.parallelStream().forEach(bytes -> TunnelData.builder().tunnelId(tunnelInfo.getId()).data(bytes).build().insert());

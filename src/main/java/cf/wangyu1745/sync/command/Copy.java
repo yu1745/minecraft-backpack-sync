@@ -11,6 +11,7 @@ import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.springframework.stereotype.Component;
@@ -21,11 +22,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-@Component
+@Component(Copy.COPY)
 @RequiredArgsConstructor
 public class Copy implements CommandExecutor {
     public static final String COPY = "copy";
     public static final Map<UUID, Pair<Class<?>, byte[]>> map = new HashMap<>();
+    private final FileConfiguration config;
 //    private long last;
 
     @SneakyThrows
@@ -60,7 +62,7 @@ public class Copy implements CommandExecutor {
                 DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
                 ItemStackUtil.saveOrdered(inv, dataOutputStream);
                 map.put(p.getUniqueId(), Pair.of(tileEntity.getClass(), byteArrayOutputStream.toByteArray()));
-                org.bukkit.inventory.ItemStack stick = new org.bukkit.inventory.ItemStack(Material.STICK);
+                org.bukkit.inventory.ItemStack stick = new org.bukkit.inventory.ItemStack(Material.valueOf(config.getString("material")));
                 ItemMeta itemMeta = stick.getItemMeta();
                 itemMeta.setDisplayName("复制棒");
                 stick.setItemMeta(itemMeta);

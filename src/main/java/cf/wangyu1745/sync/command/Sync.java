@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-@Component
+@Component(Sync.SYNC)
 @RequiredArgsConstructor
 public class Sync implements CommandExecutor {
     private enum Command {

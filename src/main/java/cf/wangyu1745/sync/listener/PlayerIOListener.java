@@ -1,7 +1,7 @@
 package cf.wangyu1745.sync.listener;
 
 import cf.wangyu1745.sync.entity.Login;
-import cf.wangyu1745.sync.util.PlayerInventoryUtil;
+import cf.wangyu1745.sync.util.PlayerUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.var;
@@ -11,6 +11,8 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitScheduler;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -23,11 +25,11 @@ import java.util.logging.Logger;
 
 @Component
 @RequiredArgsConstructor
-public class LogIOListener implements Listener {
+public class PlayerIOListener implements Listener {
     // private static final int END = -1;
-//    private final BukkitScheduler scheduler;
-//    private final JavaPlugin plugin;
-    private final PlayerInventoryUtil playerInventoryUtil;
+    private final BukkitScheduler scheduler;
+    private final JavaPlugin plugin;
+    private final PlayerUtil playerUtil;
     private static final List<String> l = new Vector<>();
     private final Logger logger;
     private final FileConfiguration config;
@@ -91,17 +93,18 @@ public class LogIOListener implements Listener {
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        playerInventoryUtil.isLogin(player).thenAcceptAsync(isLogin -> {
+        byte[] temp = PlayerUtil.toBytes(player);
+        player.getInventory().clear();
+        playerUtil.isLogin(player).thenAcceptAsync(isLogin -> {
             if (isLogin) {
-                playerInventoryUtil.thisServer(player).thenAcceptAsync(isThisServer -> {
-                    //noinspection StatementWithEmptyBody
+                playerUtil.thisServer(player).thenAcceptAsync(isThisServer -> {
                     if (isThisServer) {
                         // 常发生于服务器之前崩了,玩家没下线
-                        // 啥也不用干
+                        logger.info(player.getName() + "同服登录");
+                        scheduler.runTask(plugin,()-> PlayerUtil.reloadFromBytes(player, temp));
                     } else {
                         // 蹦极的代理先连要去的服务器再断开已经在的服务器，因此会有一段时间玩家同时在线两个服务器，此时需要等几秒原来的服务器下线
                         // 已经在线但是不是在本服务器，等待，一端时间内没有从其他服务器下线，踢出
-                        player.getInventory().clear();
                         l.add(player.getName());
                         int retry = 3;
                         var i = new AtomicInteger(retry);
@@ -110,20 +113,23 @@ public class LogIOListener implements Listener {
                             @Override
                             public void run() {
                                 TimeUnit.SECONDS.sleep(1);
-                                playerInventoryUtil.isLogin(player).thenAcceptAsync(isLogin -> {
+                                playerUtil.isLogin(player).thenAcceptAsync(isLogin -> {
                                     if (isLogin) {
                                         if (i.getAndDecrement() > 0) {
                                             logger.info("剩余尝试次数 = " + i.get());
                                             CompletableFuture.runAsync(this);
                                         } else {
-                                            player.kickPlayer("已在其他服务器在线");
+                                            scheduler.runTask(plugin, () -> {
+                                                PlayerUtil.reloadFromBytes(player, temp);
+                                                player.kickPlayer("已在其他服务器在线");
+                                            });
                                         }
                                     } else {
                                         //恢复背包
                                         logger.info("尝试" + (retry - i.get() + 1) + "次后成功登录");
-                                        playerInventoryUtil.updateLogin(player, true);
+                                        playerUtil.updateLogin(player, true);
                                         CompletableFuture.supplyAsync(() -> Login.builder().name(player.getName()).build().selectById().getLastDataId())
-                                                .thenAcceptAsync(dataId -> playerInventoryUtil.load(player, dataId))
+                                                .thenAcceptAsync(dataId -> playerUtil.load(player, dataId))
                                                 .thenRunAsync(() -> l.remove(player.getName()));
                                     }
                                 });
@@ -132,16 +138,20 @@ public class LogIOListener implements Listener {
                     }
                 });
             } else {
-                if (id.equals(playerInventoryUtil.lastLogin(player))) {
-                    // 同服登录,啥也不干
-                    logger.info(player.getName()+"同服登录");
-                    playerInventoryUtil.updateLogin(player, true);
+                if (id.equals(playerUtil.lastLogin(player))) {
+                    // 同服登录
+                    logger.info(player.getName() + "同服登录");
+                    scheduler.runTask(plugin,()-> PlayerUtil.reloadFromBytes(player, temp));
+                    playerUtil.updateLogin(player, true);
                 } else {
                     // 重载
-                    playerInventoryUtil.updateLogin(player, true);
-                    CompletableFuture.supplyAsync(() -> Login.builder().name(player.getName()).build().selectById().getLastDataId())
-                            .thenAcceptAsync(dataId -> playerInventoryUtil.load(player, dataId))
-                            .thenRunAsync(() -> l.remove(player.getName()));
+//                    player.getInventory().clear();
+                    CompletableFuture.runAsync(() -> {
+                        Long dataId = Login.builder().name(player.getName()).build().selectById().getLastDataId();
+                        playerUtil.load(player, dataId);
+                        l.remove(player.getName());
+                        playerUtil.updateLogin(player, true);
+                    });
                 }
             }
         });
@@ -152,8 +162,9 @@ public class LogIOListener implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         try {
             if (!l.remove(event.getPlayer().getName())) {
-                playerInventoryUtil.save(event.getPlayer())
-                        .thenAcceptAsync(id -> playerInventoryUtil.updateLogin(event.getPlayer(), false, id));
+                // 不在l里
+                playerUtil.save(event.getPlayer())
+                        .thenAcceptAsync(id -> playerUtil.updateLogin(event.getPlayer(), false, id));
             }
         } catch (Exception e) {
             e.printStackTrace();

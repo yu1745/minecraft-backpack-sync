@@ -20,7 +20,7 @@ import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Random;
 
-@Component
+@Component(Link.LINK)
 @RequiredArgsConstructor
 public class Link implements CommandExecutor {
     public static final String LINK = "link";

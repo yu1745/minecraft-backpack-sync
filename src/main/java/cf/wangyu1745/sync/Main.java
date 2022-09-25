@@ -1,50 +1,35 @@
 package cf.wangyu1745.sync;
 
 import cf.wangyu1745.sync.aspect.Time;
-import cf.wangyu1745.sync.command.*;
-import cf.wangyu1745.sync.listener.CopyListener;
-import cf.wangyu1745.sync.listener.KitListener;
-import cf.wangyu1745.sync.listener.LogIOListener;
 import lombok.SneakyThrows;
 import net.milkbowl.vault.economy.Economy;
-import net.minecraft.server.v1_12_R1.NBTReadLimiter;
-import net.minecraft.server.v1_12_R1.NBTTagCompound;
-import net.minecraft.server.v1_12_R1.NBTTagList;
-import org.apache.zookeeper.ZooKeeper;
+import org.apache.curator.x.async.AsyncCuratorFramework;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Player;
+import org.bukkit.event.Listener;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitScheduler;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static cf.wangyu1745.sync.command.Copy.COPY;
-import static cf.wangyu1745.sync.command.Kit.KIT;
-import static cf.wangyu1745.sync.command.Link.LINK;
-import static cf.wangyu1745.sync.command.Sync.SYNC;
-import static cf.wangyu1745.sync.command.XYZInfo.XYZ;
-
 public final class Main extends JavaPlugin {
     public static volatile boolean debug = false;
     public static final String RPC_PATH = "/sync";
 
-    public static Method listWrite;
-    public static Method listLoad;
-    public static Method write;
-    public static Method load;
     public static volatile ApplicationContext context;
+
 
     @Override
     public void onEnable() {
@@ -55,17 +40,19 @@ public final class Main extends JavaPlugin {
             return;
         }
         //注册事件监听器
-        getServer().getPluginManager().registerEvents(context.getBean(LogIOListener.class), this);
+        context.getBeansOfType(Listener.class).values().forEach(e -> getServer().getPluginManager().registerEvents(e, this));
+        /*getServer().getPluginManager().registerEvents(context.getBean(LogIOListener.class), this);
         getServer().getPluginManager().registerEvents(context.getBean(KitListener.class), this);
-        getServer().getPluginManager().registerEvents(context.getBean(CopyListener.class), this);
+        getServer().getPluginManager().registerEvents(context.getBean(CopyListener.class), this);*/
         //注册命令
-        getCommand(LINK).setExecutor(context.getBean(Link.class));
+        context.getBeansOfType(CommandExecutor.class).entrySet().stream().filter(e -> e.getValue().getClass() != Main.class)
+                .forEach(e -> getCommand(e.getKey()).setExecutor(e.getValue()));
+        /*getCommand(LINK).setExecutor(context.getBean(Link.class));
         getCommand(XYZ).setExecutor(context.getBean(XYZInfo.class));
         getCommand(COPY).setExecutor(context.getBean(Copy.class));
         getCommand(SYNC).setExecutor(context.getBean(Sync.class));
-        getCommand(KIT).setExecutor(context.getBean(Kit.class));
-
-
+        getCommand(MOVE_HOUSE).setExecutor(context.getBean(MoveHouse.class));
+        getCommand(KIT).setExecutor(context.getBean(Kit.class));*/
 //        Kit.inventory = Bukkit.createInventory(new Kit.InvHolder(), 54);
 //        getCommand()
     }
@@ -75,14 +62,8 @@ public final class Main extends JavaPlugin {
      */
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (command.getName().equalsIgnoreCase("ddd")) {
-            /*Economy economy = context.getBean(Economy.class);
-            EconomyResponse resp = economy.withdrawPlayer("wangyu", 1000);
-            System.out.println("resp.transactionSuccess() = " + resp.transactionSuccess());
-            System.out.println("resp.amount = " + resp.amount);
-            System.out.println("resp.balance = " + resp.balance);
-            System.out.println("resp.errorMessage = " + resp.errorMessage);*/
-            sender.getEffectivePermissions().forEach(e-> System.out.println(e.getPermission()));
+        if (command.getName().equalsIgnoreCase("ddd") && sender instanceof Player) {
+            sender.getEffectivePermissions().forEach(e -> System.out.println(e.getPermission()));
         }
         return true;
     }
@@ -95,22 +76,13 @@ public final class Main extends JavaPlugin {
         Map<String, LifeCycle> beansOfType = context.getBeansOfType(LifeCycle.class);
         beansOfType.values().forEach(LifeCycle::onDisable);
 
-        ZooKeeper zooKeeper = context.getBean(ZooKeeper.class);
-        zooKeeper.close();
+        AsyncCuratorFramework zooKeeper = context.getBean(AsyncCuratorFramework.class);
+        zooKeeper.unwrap().close();
     }
 
     private boolean init() {
         try {
             initConfig();
-            // 反射nbt方法们
-            write = NBTTagCompound.class.getDeclaredMethod("write", DataOutput.class);
-            write.setAccessible(true);
-            load = NBTTagCompound.class.getDeclaredMethod("load", DataInput.class, int.class, NBTReadLimiter.class);
-            load.setAccessible(true);
-            listWrite = NBTTagList.class.getDeclaredMethod("write", DataOutput.class);
-            listWrite.setAccessible(true);
-            listLoad = NBTTagList.class.getDeclaredMethod("load", DataInput.class, int.class, NBTReadLimiter.class);
-            listLoad.setAccessible(true);
             // 初始化spring
             initContext();
         } catch (Exception e) {
@@ -127,6 +99,8 @@ public final class Main extends JavaPlugin {
             getConfig().set("id", new Random().nextLong());
             saveConfig();
         }
+        // 检测material
+        Material.valueOf(getConfig().getString("material"));
         debug = getConfig().getBoolean("debug", false);
     }
 

@@ -1,19 +1,20 @@
 package cf.wangyu1745.sync.util;
 
-import cf.wangyu1745.sync.Main;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.var;
 import net.minecraft.server.v1_12_R1.IInventory;
 import net.minecraft.server.v1_12_R1.ItemStack;
-import net.minecraft.server.v1_12_R1.NBTReadLimiter;
 import net.minecraft.server.v1_12_R1.NBTTagCompound;
 import org.bukkit.Material;
 import org.bukkit.craftbukkit.v1_12_R1.inventory.CraftItemStack;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 
 @SuppressWarnings("unused")
@@ -93,49 +94,32 @@ public class ItemStackUtil {
         }
     }*/
 
-    /**
-     * 一个int的位置 一个int的长度 然后是data
-     *
-     * @param inv        要序列化的inv
-     * @param dataOutput 序列化目标
-     */
+
     public static void saveOrdered(IInventory inv, DataOutput dataOutput) {
-        for (int i = 0; i < inv.getSize(); i++) {
-            try {
-                if (CraftItemStack.asBukkitCopy(inv.getItem(i)).getType() == Material.AIR) continue;
-                var itemStack = inv.getItem(i);
-                NBTTagCompound nbtTagCompound = itemStack.save(new NBTTagCompound());
-                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(1024);
-                DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-                Main.write.invoke(nbtTagCompound, dataOutputStream);
-                dataOutput.writeInt(i);
-                dataOutput.writeInt(dataOutputStream.size());
-                dataOutput.write(byteArrayOutputStream.toByteArray());
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
+        ItemStack[] itemStacks = inv.getContents().toArray(new ItemStack[0]);
+        saveOrdered(itemStacks, dataOutput);
     }
 
+    public static void saveOrdered(List<ItemStack> itemStacks, DataOutput dataOutput) {
+        saveOrdered(itemStacks.toArray(new ItemStack[0]), dataOutput);
+    }
+
+    /**
+     * 一个int的位置 一个int的长度 然后是data
+     */
     public static void saveOrdered(ItemStack[] itemStacks, DataOutput dataOutput) {
         for (int i = 0; i < itemStacks.length; i++) {
             ItemStack itemStack = itemStacks[i];
             try {
                 NBTTagCompound nbtTagCompound = itemStack.save(new NBTTagCompound());
-                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-                Main.write.invoke(nbtTagCompound, dataOutputStream);
+                byte[] bytes = NBTUtil.toBytes(nbtTagCompound);
                 dataOutput.writeInt(i);
-                dataOutput.writeInt(dataOutputStream.size());
-                dataOutput.write(byteArrayOutputStream.toByteArray());
+                dataOutput.writeInt(bytes.length);
+                dataOutput.write(bytes);
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
-    }
-
-    public static void saveOrdered(List<ItemStack> itemStacks, DataOutput dataOutput) {
-        saveOrdered(itemStacks.toArray(new ItemStack[0]), dataOutput);
     }
 
 
@@ -147,9 +131,9 @@ public class ItemStackUtil {
             try {
                 int index = dataInput.readInt();
                 int len = dataInput.readInt();
-//            byte count = dataInput.readByte();
-                NBTTagCompound nbtTagCompound = new NBTTagCompound();
-                Main.load.invoke(nbtTagCompound, dataInput, 4, new NBTReadLimiter(2097152));
+                var bytes = new byte[len];
+                dataInput.readFully(bytes);
+                NBTTagCompound nbtTagCompound = NBTUtil.toNbt(bytes);
                 itemStacks[index] = new ItemStack(nbtTagCompound);
             } catch (Exception e) {
                 return itemStacks;
@@ -162,8 +146,66 @@ public class ItemStackUtil {
         if (bytes == null || bytes.length == 0) {
             return new org.bukkit.inventory.ItemStack(Material.AIR);
         }
-        NBTTagCompound nbt = new NBTTagCompound();
-        Main.load.invoke(nbt, new DataInputStream(new ByteArrayInputStream(bytes)), 4, new NBTReadLimiter(2097152));
-        return CraftItemStack.asBukkitCopy(new ItemStack(nbt));
+        NBTTagCompound nbtTagCompound = NBTUtil.toNbt(bytes);
+        return CraftItemStack.asBukkitCopy(new ItemStack(nbtTagCompound));
     }
+
+    /**
+     * 1个int的长度,长度个byte的数据
+     */
+    public static byte[] itemStacks2Bytes(org.bukkit.inventory.ItemStack[] itemStacks) {
+        var all = new ByteArrayOutputStream();
+        var out = new DataOutputStream(all);
+        Arrays.stream(itemStacks).filter(Objects::nonNull)
+                // .peek(e->System.out.println(e.getType()))
+                .map(CraftItemStack::asNMSCopy)
+                // .peek(e->System.out.println(e.getItem().getName()))
+                .forEach(e -> {
+                    var nbt = new NBTTagCompound();
+                    e.save(nbt);
+                    var bytes = new ByteArrayOutputStream();
+                    byte[] array = NBTUtil.toBytes(nbt);
+                    if (array.length != 0) {
+                        try {
+                            out.writeInt(array.length);
+                            out.write(array);
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+
+                });
+        return all.toByteArray();
+    }
+
+    public static List<byte[]> itemStacks2BytesList(org.bukkit.inventory.ItemStack[] itemStacks) {
+        var out = new ArrayList<byte[]>(itemStacks.length);
+        Arrays.stream(itemStacks).filter(Objects::nonNull).map(CraftItemStack::asNMSCopy).forEach(e -> {
+            var nbt = e.save(new NBTTagCompound());
+            var bytes = NBTUtil.toBytes(nbt);
+            if (bytes.length != 0) {
+                out.add(bytes);
+            }
+        });
+        return out;
+    }
+
+    /*public static org.bukkit.inventory.ItemStack[] bytes2ItemStacks(byte[] bytes) {
+        var l = new ArrayList<org.bukkit.inventory.ItemStack>();
+        var in = new DataInputStream(new ByteArrayInputStream(bytes));
+        int len;
+        try {
+            while (in.available() > 0) {
+                len = in.readInt();
+                var b = new byte[len];
+                //noinspection ResultOfMethodCallIgnored
+                in.read(b);
+                var nbt = new NBTTagCompound();
+                load.invoke(nbt, new DataInputStream(new ByteArrayInputStream(b)), 4, new NBTReadLimiter(2097152));
+                l.add(CraftItemStack.asBukkitCopy(new net.minecraft.server.v1_12_R1.ItemStack(nbt)));
+            }
+        } catch (Exception ignored) {
+        }
+        return l.toArray(new org.bukkit.inventory.ItemStack[]{});
+    }*/
 }

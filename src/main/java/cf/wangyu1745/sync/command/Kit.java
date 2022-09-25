@@ -4,7 +4,7 @@ import cf.wangyu1745.sync.entity.KitLog;
 import cf.wangyu1745.sync.mapper.KitLogMapper;
 import cf.wangyu1745.sync.mapper.KitMapper;
 import cf.wangyu1745.sync.util.ItemStackUtil;
-import cf.wangyu1745.sync.util.PlayerInventoryUtil;
+import cf.wangyu1745.sync.util.PlayerUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.RequiredArgsConstructor;
 import lombok.var;
@@ -20,7 +20,6 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitScheduler;
-import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
 import java.io.ByteArrayInputStream;
@@ -31,7 +30,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
-@Component
+//@Component(Kit.KIT)
 @RequiredArgsConstructor
 public class Kit implements CommandExecutor {
     public static final String KIT = "kit";
@@ -110,10 +109,10 @@ public class Kit implements CommandExecutor {
                     }
                     case CREATE: {
                         if (args.length == 2) {
-                            cf.wangyu1745.sync.entity.Kit.builder().data(PlayerInventoryUtil.toBytesOrdered(p)).cooldown(0).name(args[1]).build().insert();
+                            cf.wangyu1745.sync.entity.Kit.builder().data(PlayerUtil.toBytesOrdered(p)).cooldown(0).name(args[1]).build().insert();
                             reload();
                         } else if (args.length == 3) {
-                            cf.wangyu1745.sync.entity.Kit.builder().data(PlayerInventoryUtil.toBytesOrdered(p)).cooldown(Integer.parseInt(args[2])).name(args[1]).build().insert();
+                            cf.wangyu1745.sync.entity.Kit.builder().data(PlayerUtil.toBytesOrdered(p)).cooldown(Integer.parseInt(args[2])).name(args[1]).build().insert();
                             reload();
                         } else {
                             p.sendMessage("/kit create 礼包名称 冷却时间");

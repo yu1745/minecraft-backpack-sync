@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.EnumSet;
 
-@Component
+@Component(XYZInfo.XYZ)
 @RequiredArgsConstructor
 public class XYZInfo implements CommandExecutor {
     public static final String XYZ = "xyz";
